@@ -1,53 +1,36 @@
 import { extendTheme } from '@chakra-ui/react';
 
 const config = {
-  initialColorMode: 'light',
+  initialColorMode: 'dark',
   useSystemColorMode: false,
 };
 
 const colors = {
   brand: {
-    50: '#e3f2fd',
-    100: '#bbdefb',
-    200: '#90caf9',
-    300: '#64b5f6',
-    400: '#42a5f5',
-    500: '#2196f3',
-    600: '#1e88e5',
-    700: '#1976d2',
-    800: '#1565c0',
-    900: '#0d47a1',
+    50:  '#fff8e1',
+    100: '#ffeeba',
+    200: '#ffe082',
+    300: '#ffd54f',
+    400: '#ffca28',
+    500: '#f59e0b',  // accent gold
+    600: '#f59e0b',
+    700: '#e65100',
+    800: '#bf360c',
+    900: '#7f2700',
   },
-  jeans: {
-    50: '#f5f5f5',
-    100: '#e0e0e0',
-    200: '#bdbdbd',
-    300: '#9e9e9e',
-    400: '#757575',
-    500: '#616161',
-    600: '#424242',
-    700: '#37474f',
-    800: '#263238',
-    900: '#102027',
-  },
-  status: {
-    pending: '#ff9800',
-    inProgress: '#2196f3',
-    completed: '#4caf50',
-    cancelled: '#f44336',
-  }
 };
 
 const fonts = {
   heading: `'Vazirmatn', 'Tahoma', sans-serif`,
-  body: `'Vazirmatn', 'Tahoma', sans-serif`,
+  body:    `'Vazirmatn', 'Tahoma', sans-serif`,
 };
 
 const styles = {
   global: {
     body: {
-      bg: 'gray.50',
-      color: 'gray.800',
+      bg: 'transparent',
+      color: 'var(--text-primary)',
+      direction: 'rtl',
     },
   },
 };
