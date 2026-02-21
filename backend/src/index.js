@@ -12,6 +12,11 @@ const contractorRoutes = require('./routes/contractors');
 const reportsRoutes = require('./routes/reports');
 const settingsRoutes = require('./routes/settings');
 const avatarRoutes = require('./routes/avatars');
+const dashboardRoutes = require('./routes/dashboard');
+const productsRoutes = require('./routes/products');
+const workflowRoutes = require('./routes/workflow');
+const inventoryRoutes = require('./routes/inventory');
+const financeRoutes = require('./routes/finance');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,7 +40,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.1'
   });
 });
 
@@ -47,6 +52,11 @@ app.use('/api/contractors', contractorRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', avatarRoutes); // Avatar upload under users route
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/products', productsRoutes);
+app.use('/api/workflow', workflowRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/finance', financeRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

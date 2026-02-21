@@ -1,196 +1,246 @@
-import { useEffect, useState } from 'react';
-import { Eye, Edit2, Trash2, Plus, Search, Star } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import contractorsService from '../../services/contractors.service';
+import api from '../../services/api';
 
-const typeMap = {
-  FABRIC:     { label: 'پارچه',      cls: 'badge-blue'   },
-  PRODUCTION: { label: 'تولید',      cls: 'badge-green'  },
-  PACKAGING:  { label: 'بسته‌بندی', cls: 'badge-purple' },
-  STONE_WASH: { label: 'سنگ‌شویی', cls: 'badge-yellow'  },
+const TYPE_CONFIG = {
+  FABRIC:     { label:'تأمین پارچه',  color:'#3b82f6', bg:'rgba(59,130,246,.15)'  },
+  PRODUCTION: { label:'تولید',        color:'#10b981', bg:'rgba(16,185,129,.15)'  },
+  PACKAGING:  { label:'بسته‌بندی',   color:'#8b5cf6', bg:'rgba(139,92,246,.15)'   },
+  STONE_WASH: { label:'سنگ‌شویی',    color:'#f59e0b', bg:'rgba(245,158,11,.15)'   },
 };
 
-const MOCK = [
-  { id: 1, name: 'پارچه‌فروشی رضوی',      type: 'FABRIC',     phone: '۰۲۱-۱۲۳۴۵۶۷', isActive: true,  _count: { evaluations: 8  } },
-  { id: 2, name: 'تولیدی برادران احمدی',  type: 'PRODUCTION', phone: '۰۹۱۲-۳۴۵-۶۷۸', isActive: true,  _count: { evaluations: 12 } },
-  { id: 3, name: 'بسته‌بندی نوین',         type: 'PACKAGING',  phone: '۰۲۱-۹۸۷۶۵۴۳', isActive: true,  _count: { evaluations: 5  } },
-  { id: 4, name: 'سنگ‌شویی آرمان',         type: 'STONE_WASH', phone: '۰۹۱۱-۲۲۲-۳۳۳', isActive: false, _count: { evaluations: 3  } },
-  { id: 5, name: 'تولیدی شریفی',           type: 'PRODUCTION', phone: '۰۹۱۳-۴۴۴-۵۵۵', isActive: true,  _count: { evaluations: 7  } },
-];
+const TypeBadge = ({ type }) => {
+  const t = TYPE_CONFIG[type] || { label:type, color:'#94a3b8', bg:'rgba(148,163,184,.15)' };
+  return (
+    <span style={{
+      display:'inline-block', padding:'3px 10px', borderRadius:20,
+      fontSize:12, fontWeight:600, color:t.color, background:t.bg,
+    }}>{t.label}</span>
+  );
+};
 
-const ContractorsList = () => {
-  const [contractors, setContractors] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [searchTerm, setSearchTerm]   = useState('');
-  const [typeFilter, setTypeFilter]   = useState('');
+export default function ContractorsList() {
   const navigate = useNavigate();
 
-  useEffect(() => { fetchContractors(); }, [typeFilter]);
+  const [contractors, setContractors] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [search, setSearch]           = useState('');
+  const [typeFilter, setTypeFilter]   = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting]       = useState(false);
 
-  const fetchContractors = async () => {
+  const loadContractors = useCallback(async () => {
     try {
       setLoading(true);
-      const params = typeFilter ? { type: typeFilter } : {};
-      const data = await contractorsService.getAll(params);
-      const raw = data.contractors || [];
-      setContractors(raw.length ? raw : MOCK);
-    } catch {
-      setContractors(MOCK);
+      setError(null);
+      const params = {};
+      if (typeFilter) params.type = typeFilter;
+
+      const res = await api.get('/contractors', { params });
+      let data = res.data.contractors || [];
+
+      // فیلتر جستجو (client-side)
+      if (search) {
+        const term = search.toLowerCase();
+        data = data.filter(c =>
+          c.name.toLowerCase().includes(term) ||
+          (c.phone && c.phone.includes(term))
+        );
+      }
+
+      setContractors(data);
+    } catch (err) {
+      console.error('Contractors load error:', err);
+      setError('خطا در دریافت پیمانکاران');
     } finally {
       setLoading(false);
     }
-  };
+  }, [typeFilter, search]);
+
+  useEffect(() => {
+    loadContractors();
+  }, [loadContractors]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm('آیا از حذف این پیمانکار اطمینان دارید؟')) return;
     try {
-      await contractorsService.delete(id);
-      setContractors(contractors.filter((c) => c.id !== id));
-    } catch {
+      setDeleting(true);
+      await api.delete(`/contractors/${id}`);
+      setDeleteTarget(null);
+      await loadContractors();
+    } catch (err) {
       alert('خطا در حذف پیمانکار');
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const filtered = contractors.filter((c) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      c.name?.toLowerCase().includes(term) ||
-      c.phone?.includes(term)
-    );
-  });
-
-  const getType = (type) => typeMap[type?.toUpperCase()] || { label: type || '—', cls: 'badge-gray' };
+  // محاسبه میانگین امتیاز
+  const getAvgRating = (evaluations) => {
+    if (!evaluations?.length) return null;
+    const avg = evaluations.reduce((s, e) => s + e.rating, 0) / evaluations.length;
+    return avg.toFixed(1);
+  };
 
   return (
-    <>
-      {/* ─── TOOLBAR ─── */}
-      <div className="flex-between mb-16">
-        <div className="text-secondary text-sm">
-          {filtered.length} پیمانکار
+    <div className="page-container">
+
+      {/* هدر */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">پیمانکاران</h1>
+          <p className="page-subtitle">
+            {loading ? 'در حال بارگذاری...' : `${contractors.length} پیمانکار`}
+          </p>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => navigate('/contractors/new')}>
-          <Plus size={13} /> پیمانکار جدید
+        <button className="btn btn-primary" onClick={() => navigate('/contractors/new')}>
+          + پیمانکار جدید
         </button>
       </div>
 
-      {/* ─── FILTERS ─── */}
-      <div className="card mb-16" style={{ padding: '12px 16px' }}>
-        <div className="flex gap-8">
-          <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
-            <Search size={15} style={{ position: 'absolute', right: 12, color: 'var(--text-muted)' }} />
-            <input
-              className="search-input"
-              style={{ width: '100%', paddingRight: 36 }}
-              placeholder="جستجو بر اساس نام یا شماره تماس..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      {/* فیلترها */}
+      <div className="card" style={{ marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:12, alignItems:'end' }}>
+          <div className="form-group" style={{ margin:0 }}>
+            <label className="form-label">جستجو</label>
+            <input className="form-input" placeholder="نام یا شماره تماس..."
+              value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid var(--border)',
-              borderRadius: 10,
-              padding: '8px 14px',
-              color: 'var(--text-secondary)',
-              fontFamily: 'var(--font)',
-              fontSize: 13,
-              outline: 'none',
-              minWidth: 160,
-            }}
-          >
-            <option value="">همه انواع</option>
-            <option value="FABRIC">پارچه</option>
-            <option value="PRODUCTION">تولید</option>
-            <option value="PACKAGING">بسته‌بندی</option>
-            <option value="STONE_WASH">سنگ‌شویی</option>
-          </select>
+          <div className="form-group" style={{ margin:0 }}>
+            <label className="form-label">نوع پیمانکار</label>
+            <select className="form-input" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+              <option value="">همه انواع</option>
+              <option value="FABRIC">تأمین پارچه</option>
+              <option value="PRODUCTION">تولید</option>
+              <option value="PACKAGING">بسته‌بندی</option>
+              <option value="STONE_WASH">سنگ‌شویی</option>
+            </select>
+          </div>
+          <button className="btn btn-ghost"
+            onClick={() => { setSearch(''); setTypeFilter(''); }}>
+            پاک کردن
+          </button>
         </div>
       </div>
 
-      {/* ─── TABLE ─── */}
-      <div className="card animate-fadeUp">
+      {/* خطا */}
+      {error && (
+        <div style={{ background:'rgba(239,68,68,.15)', border:'1px solid #ef4444',
+          borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#f87171' }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* جدول */}
+      <div className="card">
         {loading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-            در حال بارگذاری...
+          <div className="loading-spinner"><div className="spinner"/><p>در حال بارگذاری...</p></div>
+        ) : contractors.length === 0 ? (
+          <div className="empty-state">
+            <span>🤝</span>
+            <p>هیچ پیمانکاری یافت نشد</p>
+            <button className="btn btn-primary" onClick={() => navigate('/contractors/new')}>
+              ثبت اولین پیمانکار
+            </button>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrapper">
+            <table className="data-table">
               <thead>
                 <tr>
-                  <th>نام پیمانکار</th>
+                  <th>نام</th>
                   <th>نوع</th>
                   <th>شماره تماس</th>
-                  <th>ارزیابی‌ها</th>
+                  <th>امتیاز میانگین</th>
+                  <th>تعداد ارزیابی</th>
                   <th>وضعیت</th>
                   <th>عملیات</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 40 }}>
-                      <div style={{ fontSize: 36, marginBottom: 8 }}>🏭</div>
-                      <div className="text-muted">هیچ پیمانکاری یافت نشد</div>
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((c) => {
-                    const tp = getType(c.type);
-                    return (
-                      <tr key={c.id}>
-                        <td className="font-medium text-primary">{c.name}</td>
-                        <td>
-                          <span className={`badge ${tp.cls}`}>{tp.label}</span>
-                        </td>
-                        <td dir="ltr" style={{ textAlign: 'right' }}>{c.phone || '—'}</td>
-                        <td>
-                          <div className="flex-center gap-8">
-                            <Star size={13} color="#fbbf24" fill="#fbbf24" />
-                            <span className="text-sm">{c._count?.evaluations || 0} ارزیابی</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`badge ${c.isActive ? 'badge-green' : 'badge-red'}`}>
-                            {c.isActive ? 'فعال' : 'غیرفعال'}
+                {contractors.map(c => {
+                  const avgRating = getAvgRating(c.evaluations);
+                  return (
+                    <tr key={c.id}>
+                      <td style={{ fontWeight:600 }}>{c.name}</td>
+                      <td><TypeBadge type={c.type} /></td>
+                      <td style={{ color:'#94a3b8', direction:'ltr', textAlign:'right' }}>
+                        {c.phone || '—'}
+                      </td>
+                      <td>
+                        {avgRating ? (
+                          <span style={{ color:'#f59e0b', fontWeight:700 }}>
+                            ⭐ {avgRating}
                           </span>
-                        </td>
-                        <td>
-                          <div className="flex gap-8">
-                            <button
-                              className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}
-                              onClick={() => navigate(`/contractors/${c.id}`)}
-                            >
-                              <Eye size={12} />
-                            </button>
-                            <button
-                              className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}
-                              onClick={() => navigate(`/contractors/${c.id}/edit`)}
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                            <button
-                              className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}
-                              onClick={() => handleDelete(c.id)}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                        ) : <span style={{ color:'#475569' }}>—</span>}
+                      </td>
+                      <td>
+                        <span style={{
+                          background:'rgba(139,92,246,.15)', color:'#a78bfa',
+                          padding:'2px 8px', borderRadius:6, fontSize:13
+                        }}>{c._count?.evaluations || 0}</span>
+                      </td>
+                      <td>
+                        <span style={{
+                          background: c.isActive ? 'rgba(16,185,129,.15)' : 'rgba(148,163,184,.15)',
+                          color: c.isActive ? '#34d399' : '#94a3b8',
+                          padding:'2px 10px', borderRadius:20, fontSize:12, fontWeight:600
+                        }}>
+                          {c.isActive ? 'فعال' : 'غیرفعال'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button className="btn-icon" title="ویرایش"
+                            onClick={() => navigate(`/contractors/${c.id}/edit`)}>✏️</button>
+                          <button className="btn-icon" title="ارزیابی"
+                            onClick={() => navigate(`/contractors/${c.id}`)}>⭐</button>
+                          <button className="btn-icon" title="حذف" style={{ color:'#f87171' }}
+                            onClick={() => setDeleteTarget(c)}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
-    </>
-  );
-};
 
-export default ContractorsList;
+      {/* Modal تأیید حذف */}
+      {deleteTarget && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,.7)',
+          display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000
+        }}>
+          <div style={{
+            background:'#111827', border:'1px solid #1e293b',
+            borderRadius:16, padding:28, width:'90%', maxWidth:420, direction:'rtl', textAlign:'center'
+          }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>⚠️</div>
+            <h3 style={{ color:'#f1f5f9', marginBottom:8 }}>حذف پیمانکار</h3>
+            <p style={{ color:'#94a3b8', marginBottom:24 }}>
+              آیا از حذف «{deleteTarget.name}» مطمئن هستید؟
+              <br/><small style={{ color:'#475569' }}>این عمل قابل بازگشت نیست.</small>
+            </p>
+            <div style={{ display:'flex', justifyContent:'center', gap:12 }}>
+              <button className="btn btn-ghost" onClick={() => setDeleteTarget(null)}>انصراف</button>
+              <button
+                style={{
+                  background:'rgba(239,68,68,.2)', color:'#f87171',
+                  border:'1px solid rgba(239,68,68,.3)', borderRadius:8, padding:'8px 20px',
+                  cursor:'pointer', fontFamily:'inherit'
+                }}
+                disabled={deleting}
+                onClick={() => handleDelete(deleteTarget.id)}>
+                {deleting ? 'در حال حذف...' : 'بله، حذف کن'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

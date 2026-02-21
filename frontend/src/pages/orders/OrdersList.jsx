@@ -1,227 +1,260 @@
-import { useEffect, useState } from 'react';
-import {
-  Eye, Edit2, MoreVertical, Plus, Filter, Download,
-  Search, ChevronDown,
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ordersService from '../../services/orders.service';
+import api from '../../services/api';
 
-// ─── STATUS & PRIORITY MAPS ───
-const statusMap = {
-  // new format (UPPERCASE)
-  PENDING:     { label: 'در انتظار',    cls: 'badge-gray'   },
-  CONFIRMED:   { label: 'تایید شده',   cls: 'badge-blue'   },
-  IN_PROGRESS: { label: 'در حال تولید', cls: 'badge-yellow' },
-  READY:       { label: 'آماده تحویل', cls: 'badge-purple' },
-  DELIVERED:   { label: 'تحویل شده',   cls: 'badge-green'  },
-  CANCELLED:   { label: 'لغو شده',     cls: 'badge-red'    },
-  // old format (lowercase) for backward compat
-  pending:     { label: 'در انتظار',    cls: 'badge-gray'   },
-  processing:  { label: 'در حال تولید', cls: 'badge-yellow' },
-  in_progress: { label: 'در حال تولید', cls: 'badge-yellow' },
-  completed:   { label: 'تحویل شده',   cls: 'badge-green'  },
-  cancelled:   { label: 'لغو شده',     cls: 'badge-red'    },
+// ─── ثابت‌های وضعیت و اولویت ─────────────────────────────────
+const STATUS_MAP = {
+  pending:     { label: 'در انتظار',    color: '#94a3b8', bg: 'rgba(148,163,184,.15)' },
+  processing:  { label: 'در حال تولید', color: '#fbbf24', bg: 'rgba(251,191,36,.15)'  },
+  in_progress: { label: 'در حال تولید', color: '#fbbf24', bg: 'rgba(251,191,36,.15)'  },
+  completed:   { label: 'تکمیل شده',    color: '#34d399', bg: 'rgba(52,211,153,.15)'  },
+  delivered:   { label: 'تحویل شده',    color: '#34d399', bg: 'rgba(52,211,153,.15)'  },
+  cancelled:   { label: 'لغو شده',      color: '#f87171', bg: 'rgba(248,113,113,.15)' },
 };
 
-const priorityMap = {
-  URGENT: { label: 'فوری',  cls: 'priority-urgent' },
-  HIGH:   { label: 'بالا',  cls: 'priority-high'   },
-  NORMAL: { label: 'عادی',  cls: 'priority-normal' },
-  LOW:    { label: 'پایین', cls: 'priority-low'    },
+const StatusBadge = ({ status }) => {
+  const s = STATUS_MAP[status] || { label: status || '—', color: '#94a3b8', bg: 'rgba(148,163,184,.15)' };
+  return (
+    <span style={{
+      display:'inline-block', padding:'3px 10px', borderRadius:20,
+      fontSize:12, fontWeight:600, color:s.color, background:s.bg,
+    }}>{s.label}</span>
+  );
 };
 
-// fallback mock data
-const MOCK_ORDERS = [
-  { id: 'RJ-1024', code: 'RJ-1024', customer: 'بازار بزرگ تهران',       product: 'شلوار جین کلاسیک',   qty: 240, status: 'IN_PROGRESS', priority: 'URGENT',  date: '۱۴۰۳/۰۶/۱۵', amount: '۱۲,۴۰۰,۰۰۰' },
-  { id: 'RJ-1023', code: 'RJ-1023', customer: 'فروشگاه مد پارس',        product: 'شلوار اسلیم‌فیت',    qty: 180, status: 'READY',       priority: 'HIGH',    date: '۱۴۰۳/۰۶/۱۴', amount: '۹,۸۰۰,۰۰۰'  },
-  { id: 'RJ-1022', code: 'RJ-1022', customer: 'گالری لباس آرمیتا',      product: 'جین استرچ',           qty: 300, status: 'CONFIRMED',   priority: 'NORMAL',  date: '۱۴۰۳/۰۶/۱۳', amount: '۱۶,۵۰۰,۰۰۰' },
-  { id: 'RJ-1021', code: 'RJ-1021', customer: 'پوشاک رضایی',            product: 'شلوار جین بگ',        qty: 120, status: 'DELIVERED',   priority: 'NORMAL',  date: '۱۴۰۳/۰۶/۱۲', amount: '۶,۲۰۰,۰۰۰'  },
-  { id: 'RJ-1020', code: 'RJ-1020', customer: 'بازار تجریش',            product: 'جین بوت‌کات',         qty: 96,  status: 'PENDING',     priority: 'LOW',     date: '۱۴۰۳/۰۶/۱۱', amount: '۴,۸۰۰,۰۰۰'  },
-  { id: 'RJ-1019', code: 'RJ-1019', customer: 'فروشگاه زنجیره‌ای مدرن', product: 'شلوار جین مام‌فیت',  qty: 216, status: 'IN_PROGRESS', priority: 'HIGH',    date: '۱۴۰۳/۰۶/۱۰', amount: '۱۱,۷۰۰,۰۰۰' },
-];
-
-const TABS = [
-  { v: 'all',     l: 'همه'         },
-  { v: 'active',  l: 'فعال'        },
-  { v: 'pending', l: 'در انتظار'   },
-  { v: 'done',    l: 'تحویل شده'   },
-];
-
-const OrdersList = () => {
-  const [orders, setOrders]         = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab]   = useState('all');
+// ─── صفحه اصلی ───────────────────────────────────────────────
+export default function OrdersList() {
   const navigate = useNavigate();
 
-  useEffect(() => { fetchOrders(); }, []);
+  const [orders, setOrders]       = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
 
-  const fetchOrders = async () => {
+  // فیلترها
+  const [search, setSearch]   = useState('');
+  const [status, setStatus]   = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]   = useState('');
+  const [page, setPage]       = useState(1);
+
+  // لود سفارشات از API
+  const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await ordersService.getAll();
-      const raw = data.orders || [];
-      // If API returns data, use it; otherwise use mock
-      setOrders(raw.length ? raw : MOCK_ORDERS);
-    } catch {
-      setOrders(MOCK_ORDERS);
+      setError(null);
+
+      const params = { page, limit: 20 };
+      if (search)   params.search   = search;
+      if (status)   params.status   = status;
+      if (dateFrom) params.dateFrom = dateFrom;
+      if (dateTo)   params.dateTo   = dateTo;
+
+      const res = await api.get('/orders', { params });
+      setOrders(res.data.orders || []);
+      setPagination(res.data.pagination || { page: 1, pages: 1, total: 0 });
+    } catch (err) {
+      console.error('Orders load error:', err);
+      setError('خطا در دریافت سفارشات');
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, status, dateFrom, dateTo]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('آیا از حذف این سفارش اطمینان دارید؟')) return;
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  // Export Excel
+  const handleExport = async () => {
     try {
-      await ordersService.delete(id);
-      setOrders(orders.filter((o) => o.id !== id));
-    } catch {
-      alert('خطا در حذف سفارش');
+      const params = {};
+      if (status)   params.status    = status;
+      if (dateFrom) params.startDate = dateFrom;
+      if (dateTo)   params.endDate   = dateTo;
+
+      const res = await api.get('/reports/excel/orders', { params });
+      if (res.data?.data) {
+        const rows  = res.data.data;
+        const keys  = Object.keys(rows[0] || {});
+        const csv   = [keys.join(','), ...rows.map(r => keys.map(k => `"${r[k] ?? ''}"`).join(','))].join('\n');
+        const blob  = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url   = URL.createObjectURL(blob);
+        const a     = document.createElement('a');
+        a.href = url; a.download = 'orders.csv'; a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      alert('خطا در خروجی گرفتن');
     }
   };
 
-  // filter by tab
-  const byTab = (o) => {
-    const s = (o.status || '').toUpperCase();
-    if (activeTab === 'all') return true;
-    if (activeTab === 'active') return ['CONFIRMED', 'IN_PROGRESS'].includes(s);
-    if (activeTab === 'pending') return s === 'PENDING';
-    if (activeTab === 'done') return s === 'DELIVERED';
-    return true;
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    loadOrders();
   };
 
-  // filter by search
-  const filtered = orders.filter(byTab).filter((o) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (o.code || o.id || '').toLowerCase().includes(term) ||
-      (o.name || o.customer || '').toLowerCase().includes(term) ||
-      (o.product || '').toLowerCase().includes(term)
-    );
-  });
-
-  const getStatus = (o) => statusMap[(o.status || '').toUpperCase()] || statusMap[o.status] || { label: o.status, cls: 'badge-gray' };
-  const getPriority = (o) => priorityMap[(o.priority || '').toUpperCase()] || { label: o.priority || '—', cls: 'priority-normal' };
+  const handleReset = () => {
+    setSearch(''); setStatus(''); setDateFrom(''); setDateTo('');
+    setPage(1);
+  };
 
   return (
-    <>
-      {/* ─── TOOLBAR ─── */}
-      <div className="flex-between mb-16">
-        <div className="tabs">
-          {TABS.map(({ v, l }) => (
-            <div key={v} className={`tab ${activeTab === v ? 'active' : ''}`} onClick={() => setActiveTab(v)}>
-              {l}
-            </div>
-          ))}
+    <div className="page-container">
+
+      {/* هدر */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">مدیریت سفارشات</h1>
+          <p className="page-subtitle">
+            {loading ? 'در حال بارگذاری...' : `${pagination.total?.toLocaleString('fa-IR')} سفارش`}
+          </p>
         </div>
-        <div className="flex gap-8">
-          <button className="btn btn-ghost btn-sm"><Filter size={13} /> فیلتر</button>
-          <button className="btn btn-ghost btn-sm"><Download size={13} /> اکسل</button>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate('/orders/new')}>
-            <Plus size={13} /> سفارش جدید
+        <div style={{ display:'flex', gap:10 }}>
+          <button className="btn btn-ghost" onClick={handleExport} title="خروجی اکسل">
+            📊 خروجی Excel
+          </button>
+          <button className="btn btn-primary" onClick={() => navigate('/orders/new')}>
+            + سفارش جدید
           </button>
         </div>
       </div>
 
-      {/* ─── SEARCH ─── */}
-      <div className="card mb-16" style={{ padding: '12px 16px' }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search size={15} style={{ position: 'absolute', right: 12, color: 'var(--text-muted)' }} />
-          <input
-            className="search-input"
-            style={{ width: '100%', paddingRight: 36 }}
-            placeholder="جستجو بر اساس کد، مشتری یا محصول..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+      {/* فیلترها */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <form onSubmit={handleSearch}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr auto auto', gap:12, alignItems:'end' }}>
+            <div className="form-group" style={{ margin:0 }}>
+              <label className="form-label">جستجو</label>
+              <input className="form-input" placeholder="کد یا نام سفارش..."
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ margin:0 }}>
+              <label className="form-label">وضعیت</label>
+              <select className="form-input" value={status} onChange={e => setStatus(e.target.value)}>
+                <option value="">همه وضعیت‌ها</option>
+                <option value="pending">در انتظار</option>
+                <option value="processing">در حال تولید</option>
+                <option value="completed">تکمیل شده</option>
+                <option value="cancelled">لغو شده</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ margin:0 }}>
+              <label className="form-label">از تاریخ</label>
+              <input className="form-input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ margin:0 }}>
+              <label className="form-label">تا تاریخ</label>
+              <input className="form-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </div>
+            <button type="submit" className="btn btn-primary">🔍 جستجو</button>
+            <button type="button" className="btn btn-ghost" onClick={handleReset}>پاک کردن</button>
+          </div>
+        </form>
       </div>
 
-      {/* ─── TABLE ─── */}
-      <div className="card animate-fadeUp">
+      {/* خطا */}
+      {error && (
+        <div style={{ background:'rgba(239,68,68,.15)', border:'1px solid #ef4444',
+          borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#f87171' }}>
+          ⚠️ {error} &nbsp;
+          <button onClick={loadOrders} style={{ color:'#f59e0b', background:'none', border:'none', cursor:'pointer' }}>
+            تلاش مجدد
+          </button>
+        </div>
+      )}
+
+      {/* جدول */}
+      <div className="card">
         {loading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
-            در حال بارگذاری...
+          <div className="loading-spinner">
+            <div className="spinner" />
+            <p>در حال دریافت اطلاعات...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="empty-state">
+            <span>📋</span>
+            <p>هیچ سفارشی یافت نشد</p>
+            <button className="btn btn-primary" onClick={() => navigate('/orders/new')}>
+              ثبت اولین سفارش
+            </button>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>کد سفارش</th>
-                  <th>مشتری</th>
-                  <th>محصول</th>
-                  <th>تعداد</th>
-                  <th>مبلغ (تومان)</th>
-                  <th>تاریخ</th>
-                  <th>وضعیت</th>
-                  <th>اولویت</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+          <>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: 40 }}>
-                      <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
-                      <div className="text-muted">هیچ سفارشی یافت نشد</div>
-                    </td>
+                    <th>#</th>
+                    <th>کد سفارش</th>
+                    <th>نام سفارش</th>
+                    <th>تعداد کل</th>
+                    <th>موجودی بسته‌بندی</th>
+                    <th>وضعیت</th>
+                    <th>تاریخ</th>
+                    <th>ثبت‌کننده</th>
+                    <th>عملیات</th>
                   </tr>
-                ) : (
-                  filtered.map((o) => {
-                    const st = getStatus(o);
-                    const pr = getPriority(o);
-                    return (
-                      <tr key={o.id || o.code} style={{ cursor: 'pointer' }}>
-                        <td>
-                          <span className="font-bold text-gold">{o.code || o.id}</span>
-                        </td>
-                        <td className="font-medium text-primary">{o.customer || o.name}</td>
-                        <td className="text-secondary">{o.product || o.productName || '—'}</td>
-                        <td className="font-bold">{o.qty || o.quantity || o.totalCount || '—'}</td>
-                        <td className="font-medium text-green">{o.amount || o.totalAmount || '—'}</td>
-                        <td className="text-secondary">
-                          {o.date || (o.orderDate ? new Date(o.orderDate).toLocaleDateString('fa-IR') : '—')}
-                        </td>
-                        <td>
-                          <span className={`badge ${st.cls}`}>
-                            <span className="badge-dot" style={{ background: 'currentColor' }} />
-                            {st.label}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={pr.cls}>{pr.label}</span>
-                        </td>
-                        <td>
-                          <div className="flex gap-8">
-                            <button
-                              className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}
-                              onClick={() => navigate(`/orders/${o.id}`)}
-                            >
-                              <Eye size={12} />
-                            </button>
-                            <button
-                              className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}
-                              onClick={() => navigate(`/orders/${o.id}/edit`)}
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                            <button className="icon-btn" style={{ width: 28, height: 28, borderRadius: 6 }}>
-                              <MoreVertical size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {orders.map((order, idx) => (
+                    <tr key={order.id}>
+                      <td style={{ color:'#475569' }}>
+                        {((pagination.page - 1) * 20) + idx + 1}
+                      </td>
+                      <td>
+                        <span style={{ color:'#f59e0b', fontWeight:700, fontFamily:'monospace' }}>
+                          {order.code}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight:500 }}>{order.name}</td>
+                      <td>{(order.totalCount || 0).toLocaleString('fa-IR')}</td>
+                      <td>{(order.stockPackaging || 0).toLocaleString('fa-IR')}</td>
+                      <td><StatusBadge status={order.status} /></td>
+                      <td style={{ color:'#94a3b8', fontSize:13 }}>
+                        {order.date
+                          ? new Date(order.date).toLocaleDateString('fa-IR')
+                          : new Date(order.createdAt).toLocaleDateString('fa-IR')}
+                      </td>
+                      <td style={{ color:'#94a3b8' }}>{order.creator?.displayName || '—'}</td>
+                      <td>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <button className="btn-icon" title="مشاهده"
+                            onClick={() => navigate(`/orders/${order.id}`)}>👁️</button>
+                          <button className="btn-icon" title="ویرایش"
+                            onClick={() => navigate(`/orders/${order.id}/edit`)}>✏️</button>
+                          <button className="btn-icon" title="گردش کار"
+                            onClick={() => navigate(`/workflow/${order.id}`)}>🔄</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* صفحه‌بندی */}
+            {pagination.pages > 1 && (
+              <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:12, padding:'16px 0 4px' }}>
+                <button className="btn btn-ghost"
+                  disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                  ← قبلی
+                </button>
+                <span style={{ color:'#94a3b8', fontSize:13 }}>
+                  صفحه {page} از {pagination.pages}
+                  &nbsp;({pagination.total?.toLocaleString('fa-IR')} سفارش)
+                </span>
+                <button className="btn btn-ghost"
+                  disabled={page >= pagination.pages} onClick={() => setPage(p => p + 1)}>
+                  بعدی →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
-    </>
-  );
-};
 
-export default OrdersList;
+    </div>
+  );
+}
