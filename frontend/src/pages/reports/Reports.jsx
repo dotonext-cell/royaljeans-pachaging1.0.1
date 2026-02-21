@@ -1,465 +1,303 @@
-import { useState, useEffect } from 'react';
-import {
-  Box,
-  Heading,
-  Button,
-  VStack,
-  HStack,
-  SimpleGrid,
-  Card,
-  CardBody,
-  CardHeader,
-  Text,
-  Select,
-  Input,
-  FormControl,
-  FormLabel,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
-  StatArrow,
-  useToast,
-  Spinner,
-  Divider,
-} from '@chakra-ui/react';
-import {
-  Download,
-  FileSpreadsheet,
-  Package,
-  Users,
-  TrendingUp,
-  Calendar,
-  Filter,
-} from 'lucide-react';
-import ordersService from '../../services/orders.service';
-import contractorsService from '../../services/contractors.service';
+import React, { useState, useEffect, useCallback } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../../services/api';
 
-const Reports = () => {
-  const [loading, setLoading] = useState(false);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [reportData, setReportData] = useState(null);
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
-    status: '',
-    contractorType: '',
-  });
-  const [contractors, setContractors] = useState([]);
-  const toast = useToast();
+const STATUS_MAP = {
+  pending:     { label:'در انتظار',    color:'#94a3b8' },
+  processing:  { label:'در حال تولید', color:'#fbbf24' },
+  in_progress: { label:'در حال تولید', color:'#fbbf24' },
+  completed:   { label:'تکمیل شده',    color:'#34d399' },
+  delivered:   { label:'تحویل شده',    color:'#34d399' },
+  cancelled:   { label:'لغو شده',      color:'#f87171' },
+};
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  useEffect(() => {
-    loadStatistics();
-  }, []);
-
-  const loadInitialData = async () => {
-    try {
-      const contractorsResponse = await contractorsService.getAll();
-      setContractors(contractorsResponse.contractors || []);
-    } catch (error) {
-      console.error('Error loading contractors:', error);
-    }
-  };
-
-  const loadStatistics = async () => {
-    try {
-      setStatsLoading(true);
-      const ordersResponse = await ordersService.getAll({ limit: 1000 });
-      const orders = ordersResponse.orders || [];
-
-      // Calculate statistics
-      const totalOrders = orders.length;
-      const pendingOrders = orders.filter(o => o.status === 'pending').length;
-      const processingOrders = orders.filter(o => o.status === 'processing').length;
-      const completedOrders = orders.filter(o => o.status === 'completed').length;
-      const totalQuantity = orders.reduce((sum, order) => sum + (order.totalCount || 0), 0);
-      const averageQuantity = totalOrders > 0 ? Math.round(totalQuantity / totalOrders) : 0;
-
-      setReportData({
-        orders,
-        statistics: {
-          totalOrders,
-          pendingOrders,
-          processingOrders,
-          completedOrders,
-          totalQuantity,
-          averageQuantity,
-          completionRate: totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0,
-        },
-      });
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-      toast({
-        title: 'خطا',
-        description: 'خطا در بارگذاری آمار',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  const applyFilters = () => {
-    loadStatistics();
-  };
-
-  const resetFilters = () => {
-    setFilters({
-      startDate: '',
-      endDate: '',
-      status: '',
-      contractorType: '',
-    });
-  };
-
-  const exportToExcel = async (type) => {
-    try {
-      setLoading(true);
-      
-      const params = new URLSearchParams();
-      if (filters.startDate) params.append('startDate', filters.startDate);
-      if (filters.endDate) params.append('endDate', filters.endDate);
-      if (filters.status) params.append('status', filters.status);
-      
-      const response = await api.get(`/reports/excel/${type}?${params.toString()}`, {
-        responseType: 'blob',
-      });
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${type}-report-${new Date().toISOString().split('T')[0]}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: 'موفقیت',
-        description: 'گزارش با موفقیت دانلود شد',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch (error) {
-      console.error('Export error:', error);
-      toast({
-        title: 'خطا',
-        description: 'خطا در دانلود گزارش',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'yellow',
-      processing: 'blue',
-      completed: 'green',
-      cancelled: 'red',
-    };
-    return colors[status] || 'gray';
-  };
-
-  const getStatusText = (status) => {
-    const texts = {
-      pending: 'در انتظار',
-      processing: 'در حال پردازش',
-      completed: 'تکمیل شده',
-      cancelled: 'لغو شده',
-    };
-    return texts[status] || status;
-  };
-
-  const getStatusBadge = (status) => {
-    return (
-      <Badge colorScheme={getStatusColor(status)} size="sm">
-        {getStatusText(status)}
-      </Badge>
-    );
-  };
-
-  if (statsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minH="400px">
-        <Spinner size="xl" />
-      </Box>
-    );
-  }
-
-  const { statistics, orders } = reportData || { statistics: {}, orders: [] };
-
-  // Filter orders based on current filters
-  const filteredOrders = orders.filter(order => {
-    if (filters.startDate && new Date(order.date) < new Date(filters.startDate)) return false;
-    if (filters.endDate && new Date(order.date) > new Date(filters.endDate)) return false;
-    if (filters.status && order.status !== filters.status) return false;
-    return true;
-  });
-
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
   return (
-    <Box p={6}>
-      {/* Header */}
-      <HStack justify="space-between" mb={6}>
-        <Heading size="lg">گزارشات و آمار</Heading>
-        <HStack>
-          <Button
-            leftIcon={<FileSpreadsheet />}
-            colorScheme="green"
-            variant="outline"
-            onClick={() => exportToExcel('orders')}
-            isLoading={loading}
-            loadingText="در حال دانلود..."
-          >
-            خروجی Excel
-          </Button>
-        </HStack>
-      </HStack>
-
-      <VStack spacing={6} align="stretch">
-        {/* Statistics Cards */}
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>کل سفارشات</StatLabel>
-                <StatNumber color="blue.500">{statistics.totalOrders || 0}</StatNumber>
-                <StatHelpText>
-                  <StatArrow type="increase" />
-                  تا امروز
-                </StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>سفارشات تکمیل شده</StatLabel>
-                <StatNumber color="green.500">{statistics.completedOrders || 0}</StatNumber>
-                <StatHelpText>
-                  {statistics.completionRate || 0}% کل سفارشات
-                </StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>کل تعداد تولید</StatLabel>
-                <StatNumber color="purple.500">{statistics.totalQuantity || 0}</StatNumber>
-                <StatHelpText>
-                  میانگین: {statistics.averageQuantity || 0} عدد
-                </StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>سفارشات در انتظار</StatLabel>
-                <StatNumber color="orange.500">{statistics.pendingOrders || 0}</StatNumber>
-                <StatHelpText>
-                  {statistics.processingOrders || 0} در حال پردازش
-                </StatHelpText>
-              </Stat>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <HStack justify="space-between">
-              <HStack>
-                <Filter size={20} />
-                <Heading size="md">فیلترها</Heading>
-              </HStack>
-              <HStack>
-                <Button size="sm" onClick={resetFilters}>
-                  پاک کردن فیلترها
-                </Button>
-                <Button size="sm" colorScheme="blue" onClick={applyFilters}>
-                  اعمال فیلتر
-                </Button>
-              </HStack>
-            </HStack>
-          </CardHeader>
-          <CardBody>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-              <FormControl>
-                <FormLabel fontSize="sm">تاریخ شروع</FormLabel>
-                <Input
-                  type="date"
-                  value={filters.startDate}
-                  onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  size="sm"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel fontSize="sm">تاریخ پایان</FormLabel>
-                <Input
-                  type="date"
-                  value={filters.endDate}
-                  onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  size="sm"
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel fontSize="sm">وضعیت</FormLabel>
-                <Select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  size="sm"
-                >
-                  <option value="">همه وضعیت‌ها</option>
-                  <option value="pending">در انتظار</option>
-                  <option value="processing">در حال پردازش</option>
-                  <option value="completed">تکمیل شده</option>
-                  <option value="cancelled">لغو شده</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel fontSize="sm">تأمین‌کننده</FormLabel>
-                <Select
-                  value={filters.contractorType}
-                  onChange={(e) => handleFilterChange('contractorType', e.target.value)}
-                  size="sm"
-                >
-                  <option value="">همه تأمین‌کنندگان</option>
-                  {contractors.map(contractor => (
-                    <option key={contractor.id} value={contractor.type}>
-                      {contractor.name} ({contractor.type})
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-            </SimpleGrid>
-          </CardBody>
-        </Card>
-
-        {/* Recent Orders Table */}
-        <Card>
-          <CardHeader>
-            <Heading size="md">آخرین سفارشات</Heading>
-            <Text fontSize="sm" color="gray.600" mt={1}>
-              تعداد نتایج: {filteredOrders.length} سفارش
-            </Text>
-          </CardHeader>
-          <CardBody>
-            {filteredOrders.length === 0 ? (
-              <Box textAlign="center" py={8}>
-                <Package size={48} color="gray" />
-                <Text color="gray.500" mt={2}>هیچ سفارشی یافت نشد</Text>
-              </Box>
-            ) : (
-              <Box overflowX="auto">
-                <Table variant="simple" size="sm">
-                  <Thead>
-                    <Tr>
-                      <Th>کد سفارش</Th>
-                      <Th>نام</Th>
-                      <Th>تاریخ</Th>
-                      <Th>تعداد</Th>
-                      <Th>وضعیت</Th>
-                      <Th>تأمین‌کننده</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {filteredOrders.slice(0, 10).map((order) => (
-                      <Tr key={order.id}>
-                        <Td fontWeight="bold">{order.code}</Td>
-                        <Td>{order.name}</Td>
-                        <Td>{new Date(order.date).toLocaleDateString('fa-IR')}</Td>
-                        <Td>{order.totalCount || 0}</Td>
-                        <Td>{getStatusBadge(order.status)}</Td>
-                        <Td>
-                          <Text fontSize="sm">
-                            {order.fabricSupplier || order.productionSupplier || '-'}
-                          </Text>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </Box>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* Additional Reports Options */}
-        <Card>
-          <CardHeader>
-            <Heading size="md">گزارشات تکمیلی</Heading>
-          </CardHeader>
-          <CardBody>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-              <Button
-                leftIcon={<Download />}
-                colorScheme="blue"
-                variant="outline"
-                onClick={() => exportToExcel('inventory')}
-                isLoading={loading}
-                loadingText="در حال دانلود..."
-              >
-                گزارش موجودی
-              </Button>
-
-              <Button
-                leftIcon={<Download />}
-                colorScheme="green"
-                variant="outline"
-                onClick={() => exportToExcel('contractors')}
-                isLoading={loading}
-                loadingText="در حال دانلود..."
-              >
-                گزارش پیمانکاران
-              </Button>
-
-              <Button
-                leftIcon={<Download />}
-                colorScheme="purple"
-                variant="outline"
-                onClick={() => exportToExcel('summary')}
-                isLoading={loading}
-                loadingText="در حال دانلود..."
-              >
-                خلاصه عملکرد
-              </Button>
-            </SimpleGrid>
-          </CardBody>
-        </Card>
-      </VStack>
-    </Box>
+    <div style={{
+      background:'#1e293b', border:'1px solid #334155',
+      borderRadius:10, padding:'10px 16px', fontSize:13, direction:'rtl'
+    }}>
+      <div style={{ color:'#94a3b8', marginBottom:6 }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ color:p.color, display:'flex', gap:8 }}>
+          <span>{p.name}:</span>
+          <span style={{ fontWeight:700 }}>{(p.value || 0).toLocaleString('fa-IR')}</span>
+        </div>
+      ))}
+    </div>
   );
 };
 
-export default Reports;
+export default function Reports() {
+  const [stats, setStats]         = useState(null);
+  const [orders, setOrders]       = useState([]);
+  const [pagination, setPagination] = useState({ page:1, pages:1, total:0 });
+  const [loading, setLoading]     = useState(true);
+  const [exporting, setExporting] = useState(null);
+  const [error, setError]         = useState(null);
+
+  // فیلترها
+  const [dateFrom, setDateFrom]   = useState('');
+  const [dateTo, setDateTo]       = useState('');
+  const [status, setStatus]       = useState('');
+  const [page, setPage]           = useState(1);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const orderParams = { page, limit:15 };
+      if (status)   orderParams.status   = status;
+      if (dateFrom) orderParams.dateFrom = dateFrom;
+      if (dateTo)   orderParams.dateTo   = dateTo;
+
+      const [statsRes, ordersRes] = await Promise.all([
+        api.get('/reports/statistics'),
+        api.get('/orders', { params: orderParams }),
+      ]);
+
+      setStats(statsRes.data);
+      setOrders(ordersRes.data.orders || []);
+      setPagination(ordersRes.data.pagination || { page:1, pages:1, total:0 });
+    } catch (err) {
+      console.error('Reports load error:', err);
+      setError('خطا در دریافت گزارشات');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, status, dateFrom, dateTo]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleExport = async (type) => {
+    try {
+      setExporting(type);
+      const params = {};
+      if (status)   params.status    = status;
+      if (dateFrom) params.startDate = dateFrom;
+      if (dateTo)   params.endDate   = dateTo;
+
+      const res = await api.get(`/reports/excel/${type}`, { params });
+      const data = res.data?.data;
+      if (!data?.length) { alert('داده‌ای برای خروجی وجود ندارد'); return; }
+
+      const keys = Object.keys(data[0]);
+      const csv  = [keys.join(','), ...data.map(r => keys.map(k => `"${r[k] ?? ''}"`).join(','))].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type:'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `${type}-report.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('خطا در خروجی گرفتن');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // داده چارت ماهانه از سفارشات
+  const chartData = React.useMemo(() => {
+    if (!orders.length) return [];
+    const map = {};
+    const months = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+    orders.forEach(o => {
+      const d = new Date(o.date || o.createdAt);
+      const k = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!map[k]) map[k] = { name:months[d.getMonth()], سفارشات:0, تولید:0 };
+      map[k].سفارشات += 1;
+      map[k].تولید   += o.totalCount || 0;
+    });
+    return Object.values(map);
+  }, [orders]);
+
+  return (
+    <div className="page-container">
+
+      {/* هدر */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">گزارشات</h1>
+          <p className="page-subtitle">تحلیل و خروجی داده‌های سیستم</p>
+        </div>
+        <button className="btn btn-ghost" onClick={loadData} disabled={loading}>
+          ↻ {loading ? 'در حال بارگذاری...' : 'بروزرسانی'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ background:'rgba(239,68,68,.15)', border:'1px solid #ef4444',
+          borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#f87171' }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* کارت‌های آمار */}
+      <div className="stats-grid" style={{ marginBottom:24 }}>
+        {[
+          { label:'کل سفارشات',   value: stats?.totalOrders,    color:'#f59e0b', icon:'📦' },
+          { label:'تکمیل شده',    value: stats?.completedOrders, color:'#10b981', icon:'✅' },
+          { label:'کل تولید',     value: stats?.totalQuantity,   color:'#3b82f6', icon:'🏭' },
+          { label:'در انتظار',    value: stats?.pendingOrders,   color:'#94a3b8', icon:'⏳' },
+        ].map((c, i) => (
+          <div key={i} className="stat-card" style={{ borderTop:`3px solid ${c.color}` }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div className="stat-label">{c.label}</div>
+              <span style={{ fontSize:22 }}>{c.icon}</span>
+            </div>
+            <div className="stat-value" style={{ color:c.color }}>
+              {loading ? '...' : (c.value || 0).toLocaleString('fa-IR')}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* نمودار */}
+      <div className="card" style={{ marginBottom:24 }}>
+        <div className="card-header">
+          <h3 className="card-title">📈 نمودار سفارشات و تولید</h3>
+        </div>
+        {loading ? (
+          <div className="loading-spinner"><div className="spinner"/><p>در حال بارگذاری...</p></div>
+        ) : chartData.length === 0 ? (
+          <div className="empty-state" style={{ minHeight:180 }}>
+            <span>📊</span><p>داده‌ای برای نمایش وجود ندارد</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={chartData} margin={{ top:5, right:10, left:-10, bottom:0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
+              <XAxis dataKey="name" tick={{ fill:'#64748b', fontSize:12 }} />
+              <YAxis tick={{ fill:'#64748b', fontSize:11 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ color:'#94a3b8', fontSize:12 }} />
+              <Bar dataKey="سفارشات" fill="#f59e0b" radius={[4,4,0,0]} />
+              <Bar dataKey="تولید"   fill="#3b82f6" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* فیلترها و خروجی */}
+      <div className="card" style={{ marginBottom:24 }}>
+        <div className="card-header">
+          <h3 className="card-title">🔍 فیلتر و خروجی</h3>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr auto', gap:12, marginBottom:16, alignItems:'end' }}>
+          <div className="form-group" style={{ margin:0 }}>
+            <label className="form-label">از تاریخ</label>
+            <input className="form-input" type="date" value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); setPage(1); }} />
+          </div>
+          <div className="form-group" style={{ margin:0 }}>
+            <label className="form-label">تا تاریخ</label>
+            <input className="form-input" type="date" value={dateTo}
+              onChange={e => { setDateTo(e.target.value); setPage(1); }} />
+          </div>
+          <div className="form-group" style={{ margin:0 }}>
+            <label className="form-label">وضعیت</label>
+            <select className="form-input" value={status}
+              onChange={e => { setStatus(e.target.value); setPage(1); }}>
+              <option value="">همه وضعیت‌ها</option>
+              <option value="pending">در انتظار</option>
+              <option value="processing">در حال تولید</option>
+              <option value="completed">تکمیل شده</option>
+              <option value="cancelled">لغو شده</option>
+            </select>
+          </div>
+          <button className="btn btn-ghost"
+            onClick={() => { setStatus(''); setDateFrom(''); setDateTo(''); setPage(1); }}>
+            پاک کردن
+          </button>
+        </div>
+
+        {/* دکمه‌های خروجی */}
+        <div style={{ borderTop:'1px solid rgba(255,255,255,.06)', paddingTop:16 }}>
+          <div style={{ color:'#94a3b8', fontSize:13, marginBottom:12 }}>📥 خروجی Excel:</div>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            {[
+              { key:'orders',      label:'خروجی سفارشات' },
+              { key:'inventory',   label:'خروجی موجودی' },
+              { key:'contractors', label:'خروجی پیمانکاران' },
+              { key:'summary',     label:'گزارش خلاصه' },
+            ].map(btn => (
+              <button key={btn.key} className="btn btn-ghost"
+                style={{ fontSize:13 }}
+                disabled={exporting === btn.key}
+                onClick={() => handleExport(btn.key)}>
+                {exporting === btn.key ? '⏳ در حال خروجی...' : `📊 ${btn.label}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* جدول سفارشات */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">لیست سفارشات</h3>
+          <span style={{ color:'#94a3b8', fontSize:13 }}>
+            {pagination.total?.toLocaleString('fa-IR')} مورد
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="loading-spinner"><div className="spinner"/><p>در حال بارگذاری...</p></div>
+        ) : orders.length === 0 ? (
+          <div className="empty-state"><span>📋</span><p>سفارشی یافت نشد</p></div>
+        ) : (
+          <>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>کد</th><th>نام</th><th>تعداد</th><th>بسته‌بندی</th>
+                    <th>وضعیت</th><th>تاریخ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map(o => {
+                    const st = STATUS_MAP[o.status] || { label: o.status, color:'#94a3b8' };
+                    return (
+                      <tr key={o.id}
+                        style={{ cursor:'pointer' }}
+                        onClick={() => window.location.href = `/orders/${o.id}`}>
+                        <td><span style={{ color:'#f59e0b', fontFamily:'monospace', fontSize:12 }}>{o.code}</span></td>
+                        <td style={{ fontWeight:500 }}>{o.name}</td>
+                        <td>{(o.totalCount   || 0).toLocaleString('fa-IR')}</td>
+                        <td>{(o.packingCount || 0).toLocaleString('fa-IR')}</td>
+                        <td>
+                          <span style={{
+                            background:`${st.color}22`, color:st.color,
+                            padding:'2px 8px', borderRadius:12, fontSize:12, fontWeight:600
+                          }}>{st.label}</span>
+                        </td>
+                        <td style={{ color:'#94a3b8', fontSize:13 }}>
+                          {o.date
+                            ? new Date(o.date).toLocaleDateString('fa-IR')
+                            : new Date(o.createdAt).toLocaleDateString('fa-IR')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {pagination.pages > 1 && (
+              <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:12, padding:'16px 0 4px' }}>
+                <button className="btn btn-ghost" disabled={page <= 1} onClick={() => setPage(p => p-1)}>← قبلی</button>
+                <span style={{ color:'#94a3b8', fontSize:13 }}>
+                  صفحه {page} از {pagination.pages}
+                </span>
+                <button className="btn btn-ghost" disabled={page >= pagination.pages} onClick={() => setPage(p => p+1)}>بعدی →</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+    </div>
+  );
+}
