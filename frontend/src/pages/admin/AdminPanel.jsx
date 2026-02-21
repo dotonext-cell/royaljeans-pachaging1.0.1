@@ -1,292 +1,173 @@
 import { useState, useEffect } from 'react';
-import {
-  Box,
-  Heading,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Card,
-  CardBody,
-  SimpleGrid,
-  useToast,
-  Spinner,
-  Text,
-  IconButton,
-  Flex,
-  Badge,
-  useColorModeValue,
-  InputGroup,
-  InputLeftElement,
-  Collapse,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Avatar,
-  Tooltip,
-  Alert,
-  AlertIcon,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
-  TabIndicator,
-} from '@chakra-ui/react';
-import { 
-  Save, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Search,
-  Settings,
-  Factory,
-  Scissors,
-  Package,
-  Palette,
-  Layers,
-  Tag,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  Check,
-  X,
-  Users,
-  UserCog,
-} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Plus, Edit, Trash2, Search, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import settingsService from '../../services/settings.service';
 import UserManagement from './UserManagement';
-import { useNavigate, useLocation } from 'react-router-dom';
 
-const SettingCard = ({ title, icon: Icon, items, onAdd, onEdit, onDelete, colorScheme = 'blue' }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+// ─── کارت تنظیمات ────────────────────────────────────────────
+const SettingCard = ({ title, icon, color, items, onAdd, onEdit, onDelete }) => {
+  const [expanded, setExpanded] = useState(true);
+  const [search, setSearch] = useState('');
+  const [adding, setAdding] = useState(false);
   const [newItem, setNewItem] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
 
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-
-  const filteredItems = items?.filter(item => 
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.value?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filtered = (items || []).filter(item =>
+    (item.name || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleAdd = () => {
     if (newItem.trim()) {
       onAdd(newItem.trim());
       setNewItem('');
-      setIsAdding(false);
+      setAdding(false);
     }
   };
 
-  const colorMap = {
-    blue: { bg: 'blue.50', color: 'blue.600', border: 'blue.200' },
-    green: { bg: 'green.50', color: 'green.600', border: 'green.200' },
-    purple: { bg: 'purple.50', color: 'purple.600', border: 'purple.200' },
-    orange: { bg: 'orange.50', color: 'orange.600', border: 'orange.200' },
-    teal: { bg: 'teal.50', color: 'teal.600', border: 'teal.200' },
-    pink: { bg: 'pink.50', color: 'pink.600', border: 'pink.200' },
-  };
-
-  const colors = colorMap[colorScheme] || colorMap.blue;
-
   return (
-    <Card 
-      bg={cardBg} 
-      border="1px" 
-      borderColor={borderColor}
-      overflow="hidden"
-      transition="all 0.3s ease"
-      _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
-    >
-      <CardBody p={0}>
-        {/* Header */}
-        <Flex
-          p={4}
-          align="center"
-          justify="space-between"
-          cursor="pointer"
-          onClick={() => setIsExpanded(!isExpanded)}
-          bg={colors.bg}
-          borderBottom={isExpanded ? '1px' : 'none'}
-          borderColor={colors.border}
-          transition="all 0.2s"
-          _hover={{ opacity: 0.9 }}
-        >
-          <HStack spacing={3}>
-            <Flex
-              w={10}
-              h={10}
-              align="center"
-              justify="center"
-              bg={colors.color}
-              borderRadius="xl"
-              color="white"
-              shadow="md"
+    <div style={{
+      background: '#111827', border: '1px solid #1e293b',
+      borderRadius: 16, overflow: 'hidden', marginBottom: 0,
+    }}>
+      {/* هدر */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 18px', cursor: 'pointer',
+          background: `${color}15`,
+          borderBottom: expanded ? `1px solid ${color}33` : 'none',
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: color, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: 18,
+          }}>
+            {icon}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 14 }}>{title}</div>
+            <div style={{ color: '#64748b', fontSize: 12 }}>{items?.length || 0} مورد</div>
+          </div>
+        </div>
+        <div style={{ color: '#94a3b8' }}>
+          {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </div>
+      </div>
+
+      {/* محتوا */}
+      {expanded && (
+        <div style={{ padding: 16 }}>
+          {/* جستجو و افزودن */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Search style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                color: '#64748b' }} size={14} />
+              <input
+                className="form-input"
+                style={{ paddingRight: 32, fontSize: 13 }}
+                placeholder="جستجو..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <button
+              style={{
+                padding: '6px 12px', borderRadius: 8, border: 'none',
+                background: color, color: '#fff', cursor: 'pointer',
+                fontFamily: 'inherit', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4,
+              }}
+              onClick={() => setAdding(!adding)}
             >
-              <Icon size={20} />
-            </Flex>
-            <Box>
-              <Heading size="sm" color="gray.800">{title}</Heading>
-              <Text fontSize="xs" color="gray.500">
-                {items?.length || 0} مورد تعریف شده
-              </Text>
-            </Box>
-          </HStack>
-          {isExpanded ? <ChevronUp /> : <ChevronDown />}
-        </Flex>
+              <Plus size={14} /> افزودن
+            </button>
+          </div>
 
-        <Collapse in={isExpanded}>
-          <Box p={4}>
-            {/* Search and Add */}
-            <HStack mb={4} spacing={2}>
-              <InputGroup size="sm">
-                <InputLeftElement>
-                  <Search size={14} />
-                </InputLeftElement>
-                <Input
-                  placeholder="جستجو..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </InputGroup>
-              <Button
-                size="sm"
-                colorScheme={colorScheme}
-                leftIcon={<Plus size={14} />}
-                onClick={() => setIsAdding(!isAdding)}
-              >
-                افزودن
-              </Button>
-            </HStack>
+          {/* فرم افزودن */}
+          {adding && (
+            <div style={{
+              display: 'flex', gap: 8, marginBottom: 12,
+              padding: 10, background: 'rgba(255,255,255,.04)', borderRadius: 8,
+            }}>
+              <input
+                className="form-input"
+                style={{ flex: 1, fontSize: 13 }}
+                placeholder="مقدار جدید را وارد کنید"
+                value={newItem}
+                onChange={e => setNewItem(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                autoFocus
+              />
+              <button onClick={handleAdd}
+                style={{ padding: '6px 10px', borderRadius: 6, border: 'none',
+                  background: 'rgba(16,185,129,.2)', color: '#34d399', cursor: 'pointer' }}>
+                <Check size={14} />
+              </button>
+              <button onClick={() => { setAdding(false); setNewItem(''); }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: 'none',
+                  background: 'rgba(255,255,255,.05)', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
-            {/* Add New Input */}
-            <Collapse in={isAdding}>
-              <HStack mb={4} p={3} bg="gray.50" borderRadius="lg">
-                <Input
-                  size="sm"
-                  placeholder="مقدار جدید را وارد کنید"
-                  value={newItem}
-                  onChange={(e) => setNewItem(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
-                />
-                <Button
-                  size="sm"
-                  colorScheme="green"
-                  onClick={handleAdd}
-                  isDisabled={!newItem.trim()}
-                >
-                  <Check size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => { setIsAdding(false); setNewItem(''); }}
-                >
-                  <X size={14} />
-                </Button>
-              </HStack>
-            </Collapse>
-
-            {/* Items List */}
-            {filteredItems.length === 0 ? (
-              <Alert status="info" borderRadius="lg">
-                <AlertIcon />
-                <Text fontSize="sm">موردی یافت نشد</Text>
-              </Alert>
-            ) : (
-              <Box
-                maxH="300px"
-                overflowY="auto"
-                css={{
-                  '&::-webkit-scrollbar': { width: '4px' },
-                  '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' },
-                }}
-              >
-                <VStack spacing={2} align="stretch">
-                  {filteredItems.map((item) => (
-                    <Flex
-                      key={item.id || item.name}
-                      p={3}
-                      bg="gray.50"
-                      borderRadius="lg"
-                      align="center"
-                      justify="space-between"
-                      transition="all 0.2s"
-                      _hover={{ bg: 'gray.100', transform: 'translateX(4px)' }}
-                    >
-                      <HStack spacing={3}>
-                        <Badge colorScheme={colorScheme} fontSize="sm" px={2} py={1}>
-                          {item.name || item.value}
-                        </Badge>
-                        {item.description && (
-                          <Text fontSize="xs" color="gray.500">{item.description}</Text>
-                        )}
-                      </HStack>
-                      <HStack spacing={1}>
-                        <Tooltip label="ویرایش">
-                          <IconButton
-                            size="xs"
-                            variant="ghost"
-                            icon={<Edit size={12} />}
-                            onClick={() => onEdit(item)}
-                          />
-                        </Tooltip>
-                        <Tooltip label="حذف">
-                          <IconButton
-                            size="xs"
-                            variant="ghost"
-                            colorScheme="red"
-                            icon={<Trash2 size={12} />}
-                            onClick={() => onDelete(item.id || item.name)}
-                          />
-                        </Tooltip>
-                      </HStack>
-                    </Flex>
-                  ))}
-                </VStack>
-              </Box>
-            )}
-          </Box>
-        </Collapse>
-      </CardBody>
-    </Card>
+          {/* لیست آیتم‌ها */}
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#475569', padding: '16px 0', fontSize: 13 }}>
+              موردی یافت نشد
+            </div>
+          ) : (
+            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+              {filtered.map(item => (
+                <div key={item.id || item.name}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', borderRadius: 8, marginBottom: 4,
+                    background: 'rgba(255,255,255,.03)',
+                    border: '1px solid rgba(255,255,255,.04)',
+                  }}>
+                  <span style={{
+                    background: `${color}20`, color: color,
+                    padding: '2px 10px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                  }}>
+                    {item.name || item.value}
+                  </span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => onEdit(item)}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none',
+                        background: 'rgba(255,255,255,.06)', color: '#94a3b8', cursor: 'pointer' }}>
+                      <Edit size={12} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(item.id || item.name)}
+                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none',
+                        background: 'rgba(239,68,68,.1)', color: '#f87171', cursor: 'pointer' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
+// ─── پنل مدیریت ──────────────────────────────────────────────
 const AdminPanel = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
-    productionSuppliers: [],
-    fabricSuppliers: [],
-    fabrics: [],
-    stoneWashes: [],
-    packingNames: [],
-    styles: [],
-    orderTypes: [],
-    orderLevels: [],
+    productionSuppliers: [], fabricSuppliers: [], fabrics: [],
+    stoneWashes: [], packingNames: [], styles: [], orderTypes: [], orderLevels: [],
   });
-  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Check if we're on the users page
   const isUsersPage = location.pathname === '/admin/users';
-
-  // Redirect to users page if navigating directly
-  useEffect(() => {
-    if (isUsersPage) {
-      // User management is handled by a separate route
-    }
-  }, [isUsersPage]);
 
   const fetchSettings = async () => {
     try {
@@ -294,50 +175,31 @@ const AdminPanel = () => {
       const data = await settingsService.getAll();
       setSettings(data);
     } catch (err) {
-      toast({
-        title: 'خطا',
-        description: 'دریافت تنظیمات با مشکل مواجه شد',
-        status: 'error',
-        duration: 3000,
-      });
+      console.error('Failed to load settings:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
+  useEffect(() => { fetchSettings(); }, []);
 
   const handleAdd = async (type, value) => {
+    const serviceMap = {
+      productionSuppliers: settingsService.createProductionSupplier,
+      fabricSuppliers: settingsService.createFabricSupplier,
+      fabrics: settingsService.createFabric,
+      stoneWashes: settingsService.createStoneWash,
+      packingNames: settingsService.createPackingName,
+      styles: settingsService.createStyle,
+      orderTypes: settingsService.createOrderType,
+      orderLevels: settingsService.createOrderLevel,
+    };
     try {
       setSaving(true);
-      const serviceMap = {
-        productionSuppliers: settingsService.createProductionSupplier,
-        fabricSuppliers: settingsService.createFabricSupplier,
-        fabrics: settingsService.createFabric,
-        stoneWashes: settingsService.createStoneWash,
-        packingNames: settingsService.createPackingName,
-        styles: settingsService.createStyle,
-        orderTypes: settingsService.createOrderType,
-        orderLevels: settingsService.createOrderLevel,
-      };
-
       await serviceMap[type]({ name: value, value });
       await fetchSettings();
-      toast({
-        title: 'موفق',
-        description: 'مورد جدید با موفقیت اضافه شد',
-        status: 'success',
-        duration: 2000,
-      });
     } catch (err) {
-      toast({
-        title: 'خطا',
-        description: 'افزودن مورد با مشکل مواجه شد',
-        status: 'error',
-        duration: 3000,
-      });
+      alert('خطا در افزودن مورد');
     } finally {
       setSaving(false);
     }
@@ -346,35 +208,22 @@ const AdminPanel = () => {
   const handleEdit = async (type, item) => {
     const newValue = prompt('مقدار جدید را وارد کنید:', item.name || item.value);
     if (!newValue || newValue === (item.name || item.value)) return;
-
+    const serviceMap = {
+      productionSuppliers: settingsService.updateProductionSupplier,
+      fabricSuppliers: settingsService.updateFabricSupplier,
+      fabrics: settingsService.updateFabric,
+      stoneWashes: settingsService.updateStoneWash,
+      packingNames: settingsService.updatePackingName,
+      styles: settingsService.updateStyle,
+      orderTypes: settingsService.updateOrderType,
+      orderLevels: settingsService.updateOrderLevel,
+    };
     try {
       setSaving(true);
-      const serviceMap = {
-        productionSuppliers: settingsService.updateProductionSupplier,
-        fabricSuppliers: settingsService.updateFabricSupplier,
-        fabrics: settingsService.updateFabric,
-        stoneWashes: settingsService.updateStoneWash,
-        packingNames: settingsService.updatePackingName,
-        styles: settingsService.updateStyle,
-        orderTypes: settingsService.updateOrderType,
-        orderLevels: settingsService.updateOrderLevel,
-      };
-
       await serviceMap[type](item.id || item.name, { name: newValue, value: newValue });
       await fetchSettings();
-      toast({
-        title: 'موفق',
-        description: 'مورد با موفقیت ویرایش شد',
-        status: 'success',
-        duration: 2000,
-      });
     } catch (err) {
-      toast({
-        title: 'خطا',
-        description: 'ویرایش مورد با مشکل مواجه شد',
-        status: 'error',
-        duration: 3000,
-      });
+      alert('خطا در ویرایش مورد');
     } finally {
       setSaving(false);
     }
@@ -382,207 +231,130 @@ const AdminPanel = () => {
 
   const handleDelete = async (type, id) => {
     if (!window.confirm('آیا از حذف این مورد اطمینان دارید؟')) return;
-
+    const serviceMap = {
+      productionSuppliers: settingsService.deleteProductionSupplier,
+      fabricSuppliers: settingsService.deleteFabricSupplier,
+      fabrics: settingsService.deleteFabric,
+      stoneWashes: settingsService.deleteStoneWash,
+      packingNames: settingsService.deletePackingName,
+      styles: settingsService.deleteStyle,
+      orderTypes: settingsService.deleteOrderType,
+      orderLevels: settingsService.deleteOrderLevel,
+    };
     try {
       setSaving(true);
-      const serviceMap = {
-        productionSuppliers: settingsService.deleteProductionSupplier,
-        fabricSuppliers: settingsService.deleteFabricSupplier,
-        fabrics: settingsService.deleteFabric,
-        stoneWashes: settingsService.deleteStoneWash,
-        packingNames: settingsService.deletePackingName,
-        styles: settingsService.deleteStyle,
-        orderTypes: settingsService.deleteOrderType,
-        orderLevels: settingsService.deleteOrderLevel,
-      };
-
       await serviceMap[type](id);
       await fetchSettings();
-      toast({
-        title: 'موفق',
-        description: 'مورد با موفقیت حذف شد',
-        status: 'success',
-        duration: 2000,
-      });
     } catch (err) {
-      toast({
-        title: 'خطا',
-        description: 'حذف مورد با مشکل مواجه شد',
-        status: 'error',
-        duration: 3000,
-      });
+      alert('خطا در حذف مورد');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minH="400px">
-        <Spinner size="xl" color="brand.500" />
-      </Box>
-    );
-  }
+  const tabStyle = (active) => ({
+    padding: '10px 20px', borderRadius: 10, border: 'none',
+    background: active ? '#f59e0b' : 'rgba(255,255,255,.05)',
+    color: active ? '#0b0f1a' : '#94a3b8',
+    fontFamily: 'inherit', fontWeight: active ? 700 : 400,
+    cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8,
+  });
 
   return (
-    <Box>
-      {/* Tab Navigation */}
-      <Tabs variant="unstyled" mb={6}>
-        <TabList
-          bg="white"
-          borderRadius="lg"
-          p={1}
-          boxShadow="sm"
-          border="1px"
-          borderColor="gray.200"
-        >
-          <Tab
-            borderRadius="md"
-            px={6}
-            py={3}
-            fontWeight="medium"
-            color="gray.600"
-            _selected={{
-              bg: 'brand.500',
-              color: 'white',
-              shadow: 'md',
-            }}
-            onClick={() => navigate('/admin')}
-          >
-            <HStack spacing={2}>
-              <Settings size={18} />
-              <Text>تنظیمات سیستم</Text>
-            </HStack>
-          </Tab>
-          <Tab
-            borderRadius="md"
-            px={6}
-            py={3}
-            fontWeight="medium"
-            color="gray.600"
-            _selected={{
-              bg: 'brand.500',
-              color: 'white',
-              shadow: 'md',
-            }}
-            onClick={() => navigate('/admin/users')}
-          >
-            <HStack spacing={2}>
-              <Users size={18} />
-              <Text>مدیریت کاربران</Text>
-            </HStack>
-          </Tab>
-        </TabList>
-        <TabIndicator mt="-1.5px" height="2px" bg="brand.500" borderRadius="full" />
-      </Tabs>
+    <div className="page-container">
+      {/* تب‌ها */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button style={tabStyle(!isUsersPage)} onClick={() => navigate('/admin')}>
+          ⚙️ تنظیمات سیستم
+        </button>
+        <button style={tabStyle(isUsersPage)} onClick={() => navigate('/admin/users')}>
+          👥 مدیریت کاربران
+        </button>
+      </div>
 
-      {location.pathname === '/admin/users' ? (
+      {isUsersPage ? (
         <UserManagement />
       ) : (
         <>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Box>
-          <Heading size="lg" color="gray.700">
-            پنل مدیریت سیستم
-          </Heading>
-          <Text color="gray.500" mt={1}>
-            مدیریت لیست‌های انتخابی و تنظیمات سیستم
-          </Text>
-        </Box>
-        <Button
-          leftIcon={<RefreshCw size={18} />}
-          variant="outline"
-          onClick={fetchSettings}
-          isLoading={saving}
-        >
-          بروزرسانی
-        </Button>
-      </Flex>
+          {/* هدر */}
+          <div className="page-header">
+            <div>
+              <h1 className="page-title">پنل مدیریت سیستم</h1>
+              <p className="page-subtitle">مدیریت لیست‌های انتخابی و تنظیمات سیستم</p>
+            </div>
+            <button className="btn btn-ghost" onClick={fetchSettings} disabled={saving}>
+              🔄 بروزرسانی
+            </button>
+          </div>
 
-      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-        <SettingCard
-          title="نام‌های تولیدی"
-          icon={Factory}
-          items={settings.productionSuppliers}
-          colorScheme="green"
-          onAdd={(value) => handleAdd('productionSuppliers', value)}
-          onEdit={(item) => handleEdit('productionSuppliers', item)}
-          onDelete={(id) => handleDelete('productionSuppliers', id)}
-        />
-
-        <SettingCard
-          title="نام‌های بسته‌بندی"
-          icon={Package}
-          items={settings.packingNames}
-          colorScheme="purple"
-          onAdd={(value) => handleAdd('packingNames', value)}
-          onEdit={(item) => handleEdit('packingNames', item)}
-          onDelete={(id) => handleDelete('packingNames', id)}
-        />
-
-        <SettingCard
-          title="نام‌های شستشو"
-          icon={Scissors}
-          items={settings.stoneWashes}
-          colorScheme="orange"
-          onAdd={(value) => handleAdd('stoneWashes', value)}
-          onEdit={(item) => handleEdit('stoneWashes', item)}
-          onDelete={(id) => handleDelete('stoneWashes', id)}
-        />
-
-        <SettingCard
-          title="نام‌های پارچه"
-          icon={Palette}
-          items={settings.fabrics}
-          colorScheme="blue"
-          onAdd={(value) => handleAdd('fabrics', value)}
-          onEdit={(item) => handleEdit('fabrics', item)}
-          onDelete={(id) => handleDelete('fabrics', id)}
-        />
-
-        <SettingCard
-          title="استایل‌ها"
-          icon={Layers}
-          items={settings.styles}
-          colorScheme="teal"
-          onAdd={(value) => handleAdd('styles', value)}
-          onEdit={(item) => handleEdit('styles', item)}
-          onDelete={(id) => handleDelete('styles', id)}
-        />
-
-        <SettingCard
-          title="نوع سفارش (BU)"
-          icon={Tag}
-          items={settings.orderTypes}
-          colorScheme="pink"
-          onAdd={(value) => handleAdd('orderTypes', value)}
-          onEdit={(item) => handleEdit('orderTypes', item)}
-          onDelete={(id) => handleDelete('orderTypes', id)}
-        />
-
-        <SettingCard
-          title="سطح سفارش (BV)"
-          icon={Settings}
-          items={settings.orderLevels}
-          colorScheme="blue"
-          onAdd={(value) => handleAdd('orderLevels', value)}
-          onEdit={(item) => handleEdit('orderLevels', item)}
-          onDelete={(id) => handleDelete('orderLevels', id)}
-        />
-
-        <SettingCard
-          title="تأمین‌کنندگان پارچه"
-          icon={Factory}
-          items={settings.fabricSuppliers}
-          colorScheme="green"
-          onAdd={(value) => handleAdd('fabricSuppliers', value)}
-          onEdit={(item) => handleEdit('fabricSuppliers', item)}
-          onDelete={(id) => handleDelete('fabricSuppliers', id)}
-        />
-      </SimpleGrid>
+          {loading ? (
+            <div className="loading-spinner">
+              <div className="spinner" />
+              <p>در حال بارگذاری...</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <SettingCard
+                title="نام‌های تولیدی" icon="🏭" color="#10b981"
+                items={settings.productionSuppliers}
+                onAdd={v => handleAdd('productionSuppliers', v)}
+                onEdit={i => handleEdit('productionSuppliers', i)}
+                onDelete={id => handleDelete('productionSuppliers', id)}
+              />
+              <SettingCard
+                title="نام‌های بسته‌بندی" icon="📦" color="#8b5cf6"
+                items={settings.packingNames}
+                onAdd={v => handleAdd('packingNames', v)}
+                onEdit={i => handleEdit('packingNames', i)}
+                onDelete={id => handleDelete('packingNames', id)}
+              />
+              <SettingCard
+                title="نام‌های شستشو" icon="💧" color="#f59e0b"
+                items={settings.stoneWashes}
+                onAdd={v => handleAdd('stoneWashes', v)}
+                onEdit={i => handleEdit('stoneWashes', i)}
+                onDelete={id => handleDelete('stoneWashes', id)}
+              />
+              <SettingCard
+                title="نام‌های پارچه" icon="🧵" color="#3b82f6"
+                items={settings.fabrics}
+                onAdd={v => handleAdd('fabrics', v)}
+                onEdit={i => handleEdit('fabrics', i)}
+                onDelete={id => handleDelete('fabrics', id)}
+              />
+              <SettingCard
+                title="استایل‌ها" icon="✂️" color="#06b6d4"
+                items={settings.styles}
+                onAdd={v => handleAdd('styles', v)}
+                onEdit={i => handleEdit('styles', i)}
+                onDelete={id => handleDelete('styles', id)}
+              />
+              <SettingCard
+                title="نوع سفارش (BU)" icon="🏷️" color="#ec4899"
+                items={settings.orderTypes}
+                onAdd={v => handleAdd('orderTypes', v)}
+                onEdit={i => handleEdit('orderTypes', i)}
+                onDelete={id => handleDelete('orderTypes', id)}
+              />
+              <SettingCard
+                title="سطح سفارش (BV)" icon="📊" color="#f97316"
+                items={settings.orderLevels}
+                onAdd={v => handleAdd('orderLevels', v)}
+                onEdit={i => handleEdit('orderLevels', i)}
+                onDelete={id => handleDelete('orderLevels', id)}
+              />
+              <SettingCard
+                title="تأمین‌کنندگان پارچه" icon="🏗️" color="#84cc16"
+                items={settings.fabricSuppliers}
+                onAdd={v => handleAdd('fabricSuppliers', v)}
+                onEdit={i => handleEdit('fabricSuppliers', i)}
+                onDelete={id => handleDelete('fabricSuppliers', id)}
+              />
+            </div>
+          )}
         </>
       )}
-    </Box>
+    </div>
   );
 };
 

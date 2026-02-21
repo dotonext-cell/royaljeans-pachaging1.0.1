@@ -1,22 +1,5 @@
 import { useState } from 'react';
-import {
-  Box,
-  Heading,
-  Button,
-  VStack,
-  HStack,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  Textarea,
-  Card,
-  CardBody,
-  useToast,
-  Spinner,
-} from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { Save, ArrowRight } from 'lucide-react';
 import contractorsService from '../../services/contractors.service';
 
 const ContractorCreate = () => {
@@ -27,169 +10,178 @@ const ContractorCreate = () => {
     address: '',
     notes: '',
   });
-  
+
   const [loading, setLoading] = useState(false);
-  const toast = useToast();
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
     if (!formData.name || !formData.type) {
-      toast({
-        title: 'خطا',
-        description: 'نام و نوع پیمانکار اجباری است',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      setError('نام و نوع پیمانکار اجباری است');
       return;
     }
 
     try {
       setLoading(true);
       await contractorsService.create(formData);
-      
-      toast({
-        title: 'موفقیت',
-        description: 'پیمانکار جدید با موفقیت ایجاد شد',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-      
-      navigate('/contractors');
-    } catch (error) {
-      toast({
-        title: 'خطا',
-        description: error.response?.data?.message || 'خطا در ایجاد پیمانکار',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
+      setSuccess('پیمانکار جدید با موفقیت ایجاد شد');
+      setTimeout(() => navigate('/contractors'), 1200);
+    } catch (err) {
+      setError(err.response?.data?.message || 'خطا در ایجاد پیمانکار');
     } finally {
       setLoading(false);
     }
   };
 
+  const TYPE_DESCRIPTIONS = {
+    FABRIC:     'شرکت‌هایی که پارچه و مواد اولیه را تأمین می‌کنند',
+    PRODUCTION: 'کارگاه‌ها و کارخانه‌هایی که عملیات تولید را انجام می‌دهند',
+    PACKAGING:  'شرکت‌هایی که خدمات بسته‌بندی و آماده‌سازی نهایی را ارائه می‌دهند',
+    STONE_WASH: 'مراکز شستشو و آب‌کشی که عملیات شستشوی نهایی را انجام می‌دهند',
+  };
+
   return (
-    <Box p={6}>
-      {/* Header */}
-      <HStack justify="space-between" mb={6}>
-        <HStack>
-          <Button
-            leftIcon={<ArrowRight />}
-            onClick={() => navigate('/contractors')}
-            variant="ghost"
-          >
-            بازگشت
-          </Button>
-          <Heading size="lg">ثبت پیمانکار جدید</Heading>
-        </HStack>
-        
-        <Button
-          leftIcon={<Save />}
-          colorScheme="blue"
+    <div className="page-container">
+      {/* هدر */}
+      <div className="page-header">
+        <div>
+          <button className="btn btn-ghost" onClick={() => navigate('/contractors')}
+            style={{ marginBottom: 8 }}>
+            ← بازگشت
+          </button>
+          <h1 className="page-title">ثبت پیمانکار جدید</h1>
+        </div>
+        <button
+          className="btn btn-primary"
           onClick={handleSubmit}
-          isLoading={loading}
-          loadingText="در حال ذخیره..."
+          disabled={loading}
         >
-          ذخیره پیمانکار
-        </Button>
-      </HStack>
+          {loading ? 'در حال ذخیره...' : '💾 ذخیره پیمانکار'}
+        </button>
+      </div>
 
-      <Card maxW="800px">
-        <CardBody>
-          <VStack spacing={6} align="stretch">
-            {/* Basic Information */}
-            <Box>
-              <Heading size="md" mb={4}>اطلاعات پایه</Heading>
-              <VStack spacing={4} align="stretch">
-                <FormControl isRequired>
-                  <FormLabel>نام پیمانکار</FormLabel>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    placeholder="نام کامل پیمانکار"
-                  />
-                </FormControl>
+      {/* پیام‌ها */}
+      {error && (
+        <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)',
+          borderRadius: 12, padding: '12px 18px', marginBottom: 20, color: '#f87171' }}>
+          ⚠️ {error}
+        </div>
+      )}
+      {success && (
+        <div style={{ background: 'rgba(16,185,129,.15)', border: '1px solid rgba(16,185,129,.3)',
+          borderRadius: 12, padding: '12px 18px', marginBottom: 20, color: '#34d399' }}>
+          ✅ {success}
+        </div>
+      )}
 
-                <FormControl isRequired>
-                  <FormLabel>نوع پیمانکار</FormLabel>
-                  <Select
-                    value={formData.type}
-                    onChange={(e) => handleChange('type', e.target.value)}
-                  >
-                    <option value="FABRIC">تأمین پارچه</option>
-                    <option value="PRODUCTION">تولید</option>
-                    <option value="PACKAGING">بسته‌بندی</option>
-                    <option value="STONE_WASH">شستشو</option>
-                  </Select>
-                </FormControl>
+      <div style={{ maxWidth: 720 }}>
+        <form onSubmit={handleSubmit}>
+          {/* اطلاعات پایه */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <h3 className="card-title">اطلاعات پایه</h3>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '8px 0' }}>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">نام پیمانکار *</label>
+                <input
+                  className="form-input"
+                  value={formData.name}
+                  onChange={e => handleChange('name', e.target.value)}
+                  placeholder="نام کامل پیمانکار"
+                  required
+                />
+              </div>
 
-                <FormControl>
-                  <FormLabel>شماره تماس</FormLabel>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    placeholder="مثال: 09121234567"
-                    type="tel"
-                  />
-                </FormControl>
+              <div className="form-group">
+                <label className="form-label">نوع پیمانکار *</label>
+                <select
+                  className="form-input"
+                  value={formData.type}
+                  onChange={e => handleChange('type', e.target.value)}
+                  required
+                >
+                  <option value="FABRIC">تأمین پارچه</option>
+                  <option value="PRODUCTION">تولید</option>
+                  <option value="PACKAGING">بسته‌بندی</option>
+                  <option value="STONE_WASH">شستشو</option>
+                </select>
+              </div>
 
-                <FormControl>
-                  <FormLabel>آدرس</FormLabel>
-                  <Input
-                    value={formData.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
-                    placeholder="آدرس کامل"
-                  />
-                </FormControl>
-              </VStack>
-            </Box>
+              <div className="form-group">
+                <label className="form-label">شماره تماس</label>
+                <input
+                  className="form-input"
+                  value={formData.phone}
+                  onChange={e => handleChange('phone', e.target.value)}
+                  placeholder="مثال: 09121234567"
+                  type="tel"
+                />
+              </div>
 
-            {/* Additional Information */}
-            <Box>
-              <Heading size="md" mb={4}>اطلاعات تکمیلی</Heading>
-              <VStack spacing={4} align="stretch">
-                <FormControl>
-                  <FormLabel>یادداشت‌ها</FormLabel>
-                  <Textarea
-                    value={formData.notes}
-                    onChange={(e) => handleChange('notes', e.target.value)}
-                    placeholder="یادداشت‌ها، توضیحات اضافی، یا نکات مهم در مورد این پیمانکار..."
-                    rows={6}
-                  />
-                </FormControl>
-              </VStack>
-            </Box>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">آدرس</label>
+                <input
+                  className="form-input"
+                  value={formData.address}
+                  onChange={e => handleChange('address', e.target.value)}
+                  placeholder="آدرس کامل"
+                />
+              </div>
+            </div>
+          </div>
 
-            {/* Contractor Type Information */}
-            <Box bg="blue.50" p={4} borderRadius="md">
-              <Heading size="sm" mb={2} color="blue.700">
-                راهنمای نوع پیمانکار
-              </Heading>
-              <VStack align="start" spacing={2} fontSize="sm" color="blue.600">
-                <Box>
-                  <strong>تأمین پارچه:</strong> شرکت‌هایی که پارچه و مواد اولیه را تأمین می‌کنند
-                </Box>
-                <Box>
-                  <strong>تولید:</strong> کارگاه‌ها و کارخانه‌هایی که عملیات تولید را انجام می‌دهند
-                </Box>
-                <Box>
-                  <strong>بسته‌بندی:</strong> شرکت‌هایی که خدمات بسته‌بندی و آماده‌سازی نهایی را ارائه می‌دهند
-                </Box>
-                <Box>
-                  <strong>شستشو:</strong> مراکز شستشو و آب‌کشی که عملیات شستشوی نهایی را انجام می‌دهند
-                </Box>
-              </VStack>
-            </Box>
-          </VStack>
-        </CardBody>
-      </Card>
-    </Box>
+          {/* اطلاعات تکمیلی */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <h3 className="card-title">اطلاعات تکمیلی</h3>
+            </div>
+            <div style={{ padding: '8px 0' }}>
+              <div className="form-group">
+                <label className="form-label">یادداشت‌ها</label>
+                <textarea
+                  className="form-input"
+                  value={formData.notes}
+                  onChange={e => handleChange('notes', e.target.value)}
+                  placeholder="یادداشت‌ها، توضیحات اضافی، یا نکات مهم..."
+                  rows={5}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* راهنما */}
+          {formData.type && (
+            <div style={{
+              background: 'rgba(59,130,246,.1)', border: '1px solid rgba(59,130,246,.2)',
+              borderRadius: 12, padding: '14px 18px',
+            }}>
+              <div style={{ color: '#60a5fa', fontWeight: 600, marginBottom: 6, fontSize: 13 }}>
+                💡 راهنمای نوع انتخاب‌شده
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: 13 }}>
+                <strong style={{ color: '#cbd5e1' }}>
+                  {formData.type === 'FABRIC' ? 'تأمین پارچه' :
+                   formData.type === 'PRODUCTION' ? 'تولید' :
+                   formData.type === 'PACKAGING' ? 'بسته‌بندی' : 'شستشو'}:
+                </strong>{' '}
+                {TYPE_DESCRIPTIONS[formData.type]}
+              </div>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
   );
 };
 

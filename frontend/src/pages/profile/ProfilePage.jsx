@@ -40,7 +40,7 @@ const ProfilePage = () => {
 
   const showMessage = (type, text, duration = 3000) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: }), duration);
+    setTimeout(() => setMessage({ type: '', text: '' }), duration);
   };
 
   const handleProfileChange = (e) => {

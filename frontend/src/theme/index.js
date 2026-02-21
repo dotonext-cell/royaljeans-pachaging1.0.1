@@ -1,46 +1,27 @@
-import { extendTheme } from '@chakra-ui/react';
+// Theme configuration - no longer using Chakra UI
+// Colors and design tokens for Royal Jeans
 
-const config = {
-  initialColorMode: 'dark',
-  useSystemColorMode: false,
-};
-
-const colors = {
-  brand: {
-    50:  '#fff8e1',
-    100: '#ffeeba',
-    200: '#ffe082',
-    300: '#ffd54f',
-    400: '#ffca28',
-    500: '#f59e0b',  // accent gold
-    600: '#f59e0b',
-    700: '#e65100',
-    800: '#bf360c',
-    900: '#7f2700',
+export const colors = {
+  accent: {
+    gold:   '#f59e0b',
+    red:    '#ef4444',
+    green:  '#10b981',
+    blue:   '#3b82f6',
+    purple: '#8b5cf6',
+  },
+  bg: {
+    primary: '#0b0f1a',
+    card:    '#111827',
+    hover:   'rgba(255,255,255,0.05)',
+  },
+  text: {
+    primary:   '#f1f5f9',
+    secondary: '#94a3b8',
+    muted:     '#475569',
+  },
+  border: {
+    base: 'rgba(255,255,255,0.06)',
   },
 };
 
-const fonts = {
-  heading: `'Vazirmatn', 'Tahoma', sans-serif`,
-  body:    `'Vazirmatn', 'Tahoma', sans-serif`,
-};
-
-const styles = {
-  global: {
-    body: {
-      bg: 'transparent',
-      color: 'var(--text-primary)',
-      direction: 'rtl',
-    },
-  },
-};
-
-const theme = extendTheme({
-  config,
-  direction: 'rtl',
-  colors,
-  fonts,
-  styles,
-});
-
-export default theme;
+export default colors;
