@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Package, Tag, Box, Search, X } from 'lucide-react';
 import { productsService } from '../../services/products.service';
+import { toPersianNumbers } from '../../utils/jalali';
 
 export default function ProductsPage() {
   const [products, setProducts]     = useState([]);
@@ -43,6 +45,18 @@ export default function ProductsPage() {
     loadProducts();
   };
 
+  const getProductIdentifier = (product) => {
+    // محاسبه شناسه محصول از کد سفارش و نام کالا
+    const orderCode = product.orderCode || product.code || 'N/A';
+    const productName = product.name || product.productName || 'بدون نام';
+
+    return {
+      code: orderCode,
+      name: productName,
+      display: `${orderCode} - ${productName}`,
+    };
+  };
+
   return (
     <div className="page-container">
 
@@ -50,57 +64,101 @@ export default function ProductsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">مدیریت محصولات</h1>
-          <p className="page-subtitle">
-            {loading ? 'در حال بارگذاری...' : `${products.length} محصول یافت شد`}
+          <p className="page-subtitle mt-0.5">
+            {loading ? 'در حال بارگذاری...' : `${toPersianNumbers(products.length.toString())} محصول یافت شد`}
           </p>
         </div>
       </div>
 
       {/* کارت‌های آمار */}
       {stats && (
-        <div className="stats-grid" style={{ marginBottom: 24 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="stat-card" style={{ borderTop: '3px solid #f59e0b' }}>
-            <div className="stat-label">محصولات یکتا</div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="stat-label">محصولات یکتا</div>
+              <div className="w-11 h-11 rounded-xl bg-accent-gold/15 flex items-center justify-center">
+                <Package size={20} className="text-accent-gold" />
+              </div>
+            </div>
             <div className="stat-value" style={{ color: '#f59e0b' }}>
-              {(stats.uniqueProducts || 0).toLocaleString('fa-IR')}
+              {toPersianNumbers((stats.uniqueProducts || 0).toString())}
             </div>
           </div>
           <div className="stat-card" style={{ borderTop: '3px solid #3b82f6' }}>
-            <div className="stat-label">کل تولید شده</div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="stat-label">کل تولید شده</div>
+              <div className="w-11 h-11 rounded-xl bg-accent-blue/15 flex items-center justify-center">
+                <Box size={20} className="text-accent-blue" />
+              </div>
+            </div>
             <div className="stat-value" style={{ color: '#3b82f6' }}>
-              {(stats.totalProduced || 0).toLocaleString('fa-IR')}
+              {toPersianNumbers((stats.totalProduced || 0).toString())}
             </div>
           </div>
           <div className="stat-card" style={{ borderTop: '3px solid #10b981' }}>
-            <div className="stat-label">کل بسته‌بندی شده</div>
+            <div className="flex items-center justify-between mb-4">
+              <div className="stat-label">کل بسته‌بندی شده</div>
+              <div className="w-11 h-11 rounded-xl bg-accent-green/15 flex items-center justify-center">
+                <Tag size={20} className="text-accent-green" />
+              </div>
+            </div>
             <div className="stat-value" style={{ color: '#10b981' }}>
-              {(stats.totalPacked || 0).toLocaleString('fa-IR')}
+              {toPersianNumbers((stats.totalPacked || 0).toString())}
+            </div>
+          </div>
+          <div className="stat-card" style={{ borderTop: '3px solid #8b5cf6' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="stat-label">در انتظار تولید</div>
+              <div className="w-11 h-11 rounded-xl bg-accent-purple/15 flex items-center justify-center">
+                <Search size={20} className="text-accent-purple" />
+              </div>
+            </div>
+            <div className="stat-value" style={{ color: '#8b5cf6' }}>
+              {toPersianNumbers(((stats.uniqueProducts || 0) - (stats.totalProduced || 0)).toString())}
             </div>
           </div>
         </div>
       )}
 
       {/* فیلترها */}
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="glass-card p-5 mb-5">
         <form onSubmit={handleSearch}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto auto', gap:12, alignItems:'end' }}>
-            <div className="form-group" style={{ margin:0 }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
               <label className="form-label">جستجو</label>
-              <input className="form-input" placeholder="نام یا کد محصول..."
-                value={search} onChange={e => setSearch(e.target.value)} />
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input
+                  className="form-input pr-10"
+                  placeholder="کد سفارش یا نام محصول..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="form-group" style={{ margin:0 }}>
+            <div>
               <label className="form-label">استایل</label>
-              <select className="form-input" value={styleFilter} onChange={e => setStyleFilter(e.target.value)}>
+              <select
+                className="form-input"
+                value={styleFilter}
+                onChange={e => setStyleFilter(e.target.value)}
+              >
                 <option value="">همه استایل‌ها</option>
                 {styles.map(s => (
                   <option key={s.id} value={s.name}>{s.name}</option>
                 ))}
               </select>
             </div>
-            <button type="submit" className="btn btn-primary">🔍 جستجو</button>
-            <button type="button" className="btn btn-ghost"
-              onClick={() => { setSearch(''); setStyleFilter(''); }}>
+            <button type="submit" className="btn btn-primary">
+              <Search size={18} />
+              جستجو
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => { setSearch(''); setStyleFilter(''); }}
+            >
+              <X size={16} />
               پاک کردن
             </button>
           </div>
@@ -109,34 +167,35 @@ export default function ProductsPage() {
 
       {/* خطا */}
       {error && (
-        <div style={{ background:'rgba(239,68,68,.15)', border:'1px solid #ef4444',
-          borderRadius:12, padding:'12px 18px', marginBottom:20, color:'#f87171' }}>
-          ⚠️ {error}
+        <div className="mb-5 p-4 rounded-xl border border-red-500/30 bg-red-500/15 text-red-400 flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          {error}
         </div>
       )}
 
       {/* جدول */}
-      <div className="card">
+      <div className="glass-card">
         {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner" />
+          <div className="flex flex-col items-center justify-center py-16 gap-4 text-text-muted">
+            <div className="spinner"></div>
             <p>در حال دریافت اطلاعات...</p>
           </div>
         ) : products.length === 0 ? (
           <div className="empty-state">
-            <span>🧴</span>
+            <Package size={48} opacity={0.5} />
             <p>هیچ محصولی یافت نشد</p>
-            <small style={{ color:'#64748b' }}>
-              محصولات از سفارشات ثبت‌شده استخراج می‌شوند
+            <small className="text-text-muted text-sm">
+              محصولات از کد سفارش و نام کالا شناسایی می‌شوند
             </small>
           </div>
         ) : (
-          <div className="table-wrapper">
+          <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>کد</th>
-                  <th>نام محصول</th>
+                  <th>شناسه محصول</th>
+                  <th>کد سفارش</th>
+                  <th>نام کالا</th>
                   <th>استایل</th>
                   <th>پارچه</th>
                   <th>سنگشویی</th>
@@ -144,32 +203,40 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <span style={{ color:'#f59e0b', fontFamily:'monospace', fontSize:12 }}>
-                        {p.code}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight:500 }}>{p.name}</td>
-                    <td>
-                      {p.style && p.style !== '—' ? (
-                        <span style={{
-                          background:'rgba(59,130,246,.15)', color:'#60a5fa',
-                          padding:'2px 8px', borderRadius:6, fontSize:12
-                        }}>{p.style}</span>
-                      ) : <span style={{ color:'#475569' }}>—</span>}
-                    </td>
-                    <td style={{ color:'#94a3b8', fontSize:13 }}>{p.fabric}</td>
-                    <td style={{ color:'#94a3b8', fontSize:13 }}>{p.stoneWash}</td>
-                    <td>
-                      <span style={{
-                        background:'rgba(245,158,11,.15)', color:'#f59e0b',
-                        padding:'2px 10px', borderRadius:6, fontSize:13, fontWeight:600
-                      }}>{p.orderCount}</span>
-                    </td>
-                  </tr>
-                ))}
+                {products.map((p) => {
+                  const identifier = getProductIdentifier(p);
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <span className="text-accent-gold font-mono text-xs bg-accent-gold/10 px-2 py-1 rounded">
+                          {identifier.code}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="font-semibold text-text-primary text-sm">
+                          {identifier.code}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 500 }}>
+                        {identifier.name}
+                      </td>
+                      <td>
+                        {p.style && p.style !== '—' ? (
+                          <span className="badge badge-blue text-xs px-2 py-1">
+                            {p.style}
+                          </span>
+                        ) : <span className="text-text-muted">—</span>}
+                      </td>
+                      <td className="text-text-muted text-sm">{p.fabric}</td>
+                      <td className="text-text-muted text-sm">{p.stoneWash}</td>
+                      <td>
+                        <span className="badge badge-yellow text-sm px-2.5 py-1 font-semibold">
+                          {toPersianNumbers(p.orderCount?.toString() || '0')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -177,9 +244,12 @@ export default function ProductsPage() {
       </div>
 
       {/* توضیح */}
-      <div style={{ marginTop:16, padding:'12px 18px', background:'rgba(59,130,246,.08)',
-        border:'1px solid rgba(59,130,246,.2)', borderRadius:10, color:'#94a3b8', fontSize:13 }}>
-        💡 محصولات از نام سفارشات ثبت‌شده در دیتابیس استخراج می‌شوند. پس از مهاجرت به ساختار جدید، جدول مستقل محصول ایجاد خواهد شد.
+      <div className="mt-4 p-4 rounded-xl border border-accent-blue/20 bg-accent-blue/8 text-text-muted text-sm flex items-start gap-3">
+        <span className="text-lg">💡</span>
+        <p className="leading-relaxed">
+          محصولات از <strong className="text-text-primary">کد سفارش</strong> و <strong className="text-text-primary">نام کالا</strong> شناسایی می‌شوند.
+          هر ترکیب منحصر به فرد کد سفارش و نام کالا، یک محصول یکتا محسوب می‌شود.
+        </p>
       </div>
 
     </div>
