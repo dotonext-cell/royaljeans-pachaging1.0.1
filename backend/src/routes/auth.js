@@ -9,10 +9,13 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, displayName, nickname, role = 'USER' } = req.body;
+    const { email, password, displayName, fullName, nickname, role = 'USER' } = req.body;
+
+    // Use fullName if displayName not provided (for compatibility)
+    const finalDisplayName = displayName || fullName;
 
     // Validation
-    if (!email || !password || !displayName) {
+    if (!email || !password || !finalDisplayName) {
       return res.status(400).json({ message: 'همه فیلدهای اجباری را پر کنید' });
     }
 
@@ -37,8 +40,8 @@ router.post('/register', async (req, res) => {
       data: {
         email,
         password: hashedPassword,
-        displayName,
-        nickname: nickname || displayName, // Default nickname to displayName if not provided
+        displayName: finalDisplayName,
+        nickname: nickname || finalDisplayName, // Default nickname to displayName if not provided
         role
       },
       select: {
